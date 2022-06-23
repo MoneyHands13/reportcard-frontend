@@ -24,7 +24,7 @@ export class RcStudentsComponent implements OnInit {
   }
 
   loadStudents() {
-    this.studentService.getStudents().subscribe({
+    this.studentService.getAll().subscribe({
       next: (students) => {
         this.students = students;
       },
@@ -46,15 +46,15 @@ export class RcStudentsComponent implements OnInit {
     modalRef.result.then((result) => {
       if (result) {
         // TODO this should be removed from here
-        this.loadStudents();
       }
+      this.loadStudents();
     });
   }
 
   deleteStudentAction(student: Student) {
     const confirmDelete = confirm(`Are you sure you want to delete account of: ${student.name}`);
     if (confirmDelete) {
-      this.studentService.deleteStudent(student.id).subscribe({
+      this.studentService.delete(student.id).subscribe({
         next: (res) => {
           addToMessageService(this.messageService, 'success', `Student ${student.name} deleted successfully`, `${res.message}`);
           this.loadStudents();

@@ -1,5 +1,5 @@
 import {Component, OnInit} from '@angular/core';
-import {SchoolSettings} from "../../../../models/dto/schoolsettings.model";
+import {SchoolSettings} from "../../../../models/dto/school-settings.model";
 import {SchoolSettingsService} from "../../../../services/school-settings.service";
 import {addToMessageService} from "../../../../utils/message-service.util";
 import {MessageService} from "primeng/api";
@@ -8,12 +8,13 @@ import {SequenceService} from "../../../../services/sequence.service";
 import {TermService} from "../../../../services/term.service";
 import {AcademicYearService} from "../../../../services/academic-year.service";
 import {Term} from "../../../../models/dto/term.model";
-import {AcademicYear} from "../../../../models/dto/academicyear.model";
+import {AcademicYear} from "../../../../models/dto/academic-year.model";
 import {FormBuilder, FormGroup, Validators} from "@angular/forms";
 import {DefaultService} from "../../../../services/default.service";
 import {AcademicYearUtil} from "../../../../utils/academic-year.util";
 
 type ATS = AcademicYear | Term | Sequence;
+
 enum ATSName {
   YEAR, TERM, SEQUENCE,
 }
@@ -25,14 +26,13 @@ enum ATSName {
 })
 export class RcSettingsComponent implements OnInit {
 
-  private readonly defaultSettings: SchoolSettings;
-  schoolSettingsValid: boolean =  false;
-
+  schoolSettingsValid: boolean = false;
   settingsForm: FormGroup = this.fb.group({});
   schoolSettings: SchoolSettings;
   terms: Term[] = [];
   sequences: Sequence[] = [];
   academicYears: AcademicYear[] = [];
+  private readonly defaultSettings: SchoolSettings;
 
   constructor(
     private fb: FormBuilder,
@@ -44,12 +44,14 @@ export class RcSettingsComponent implements OnInit {
     private academicYearService: AcademicYearService
   ) {
     this.defaultSettings = {
-      id: -1, curr_seq_id: -1, curr_year_id: -1, curr_term: '',
+      id: -1, school_name: '',
+      curr_seq_id: -1, curr_year_id: -1, curr_term: '',
       application_is_open: false, min_grade: 0, max_grade: 0,
     };
     this.schoolSettings = this.defaultSettings;
     this.settingsForm = this.fb.group({
       applicationsOpen: [this.schoolSettings.application_is_open, Validators.required],
+      schoolName: ['', Validators.required],
       year: [0, Validators.required],
       term: [0, Validators.required],
       sequence: [0, Validators.required],
@@ -61,51 +63,17 @@ export class RcSettingsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadSettings();
-
-  }
-
-  private updateSchoolSettingsValid = (): void => {
-    if(this.schoolSettings == null) {
-      this.schoolSettingsValid = false;
-      return
-    }
-    this.schoolSettingsValid = this.schoolSettings != this.defaultSettings && (
-      this.schoolSettings.max_grade !== null && this.schoolSettings.min_grade !== null
-    );
-  }
-
-  private isValidSettings = (settings: SchoolSettings): { valid: boolean, errors: string[] } => {
-    console.log(settings)
-    const errs: string[] = [];
-    const term: Term = this.getTermBySequenceId(settings.curr_seq_id);
-    const sequencesByTerm = this.sequences.filter(seq => seq.term_id == term.id);
-    const sequenceValid: boolean = sequencesByTerm.find(seq => seq.id == settings.curr_seq_id) != undefined;
-
-    {
-      if(!sequenceValid) {
-        errs.push("This sequence is not compatible with this term");
-      }
-    }
-
-    const gradeValid = settings.min_grade < settings.max_grade;
-
-    {
-      if(!gradeValid) {
-        errs.push("Maximum grade score must be higher than the minimum grade score");
-      }
-    }
-
-    return {valid: sequenceValid && gradeValid, errors: errs};
   }
 
   patchSettingsForm(schoolSettings: SchoolSettings): void {
-    if(schoolSettings == null) {
+    if (schoolSettings == null) {
       schoolSettings = this.defaultSettings;
       if (this.sequences.length > 0) schoolSettings.curr_seq_id = this.sequences[0].id
       if (this.academicYears.length > 0) schoolSettings.curr_year_id = this.academicYears[0].id
     }
     this.settingsForm.patchValue({
       "applicationsOpen": schoolSettings.application_is_open,
+      "schoolName": schoolSettings.school_name,
       "year": schoolSettings.curr_year_id,
       "sequence": schoolSettings.curr_seq_id,
       "minGrade": schoolSettings.min_grade,
@@ -114,7 +82,7 @@ export class RcSettingsComponent implements OnInit {
   }
 
   loadSettings(): void {
-    this.schoolSettingsService.getSettings().subscribe({
+    this.schoolSettingsService.get().subscribe({
       next: (schoolSettings) => {
         this.schoolSettings = schoolSettings;
         this.updateSchoolSettingsValid();
@@ -127,20 +95,21 @@ export class RcSettingsComponent implements OnInit {
   }
 
   loadSettingsInfo(): void {
-    this.sequenceService.getAllSequences().subscribe({
+    this.sequenceService.getAll().subscribe({
       next: (sequences) => this.sequences = sequences,
     });
-    this.termService.getAllTerms().subscribe({
+    this.termService.getAll().subscribe({
       next: (terms) => this.terms = terms,
     });
-    this.academicYearService.getAllAcademicYears().subscribe({
+    this.academicYearService.getAll().subscribe({
       next: (years) => this.academicYears = years,
     });
   }
 
   saveSettingsAction() {
     const settings: SchoolSettings = {
-      id: this.schoolSettings ? this.schoolSettings.id: -1,
+      id: this.schoolSettings ? this.schoolSettings.id : -1,
+      school_name: this.settingsForm.get('schoolName')?.value,
       application_is_open: this.settingsForm.get('applicationsOpen')?.value,
       min_grade: this.settingsForm.get('minGrade')?.value,
       max_grade: this.settingsForm.get('maxGrade')?.value,
@@ -150,21 +119,21 @@ export class RcSettingsComponent implements OnInit {
 
     const settingsValidRes = this.isValidSettings(settings);
     if (settingsValidRes.valid) {
-      if(settings.id <= 0) {
-        this.schoolSettingsService.addSettings(settings).subscribe({
+      if (settings.id <= 0) {
+        this.schoolSettingsService.save(settings).subscribe({
           next: () => addToMessageService(this.msgService, 'success', 'Saved', 'Settings saved successfully'),
           error: err => addToMessageService(this.msgService, 'error', 'Error', err.error.message),
           complete: () => this.loadSettings()
         });
       } else {
-        this.schoolSettingsService.updateSettings(settings).subscribe({
+        this.schoolSettingsService.update(settings).subscribe({
           next: () => addToMessageService(this.msgService, 'success', 'Saved', 'Settings saved successfully'),
           error: err => addToMessageService(this.msgService, 'error', 'Error', err.error.message),
           complete: () => this.loadSettings()
         });
       }
     } else {
-      for (let i = 0; i < settingsValidRes.errors.length; i ++ ) {
+      for (let i = 0; i < settingsValidRes.errors.length; i++) {
         addToMessageService(this.msgService, 'warn', 'Invalid Settings', `Warning ${i + 1}: ${settingsValidRes.errors[i]}`)
       }
     }
@@ -172,7 +141,7 @@ export class RcSettingsComponent implements OnInit {
 
   loadDefaultDataAction() {
     this.defaultService.create().subscribe({
-      next: (res) => addToMessageService(this.msgService, 'success', 'Success', 'Successfully loaded default data!\n'+res),
+      next: (res) => addToMessageService(this.msgService, 'success', 'Success', 'Successfully loaded default data!\n' + res),
       error: (err) => {
         addToMessageService(this.msgService, 'error', 'Error', err.message);
       }
@@ -186,19 +155,19 @@ export class RcSettingsComponent implements OnInit {
   editATSAction($event: MouseEvent, atsName: ATSName, entity: ATS, inputElement: HTMLInputElement) {
     const editButton = $event.target as HTMLButtonElement;
 
-    if(inputElement.disabled) {
+    if (inputElement.disabled) {
       editButton.textContent = "Save";
       inputElement.disabled = false;
     } else {
       editButton.textContent = "Edit";
       inputElement.disabled = true;
-      if(entity.name !== inputElement.value) {
+      if (entity.name !== inputElement.value) {
         entity.name = inputElement.value;
         switch (atsName) {
           case ATSName.YEAR: {
             console.log(entity)
-            if(AcademicYearUtil.isValid(entity.name)) {
-              this.academicYearService.updateAcademicYear(entity as AcademicYear).subscribe({
+            if (AcademicYearUtil.isValid(entity.name)) {
+              this.academicYearService.update(entity as AcademicYear).subscribe({
                 next: (res) => addToMessageService(this.msgService, 'success', 'Update successful', res.message),
                 error: (err) => addToMessageService(this.msgService, 'error', 'Update failed', err.message),
                 complete: () => this.loadSettingsInfo()
@@ -210,7 +179,7 @@ export class RcSettingsComponent implements OnInit {
             break;
           }
           case ATSName.TERM: {
-            this.termService.updateTerm(entity as Term).subscribe({
+            this.termService.update(entity as Term).subscribe({
               next: (res) => addToMessageService(this.msgService, 'success', 'Update successful', res.message),
               error: (err) => addToMessageService(this.msgService, 'error', 'Update failed', err.message),
               complete: () => this.loadSettingsInfo()
@@ -218,14 +187,16 @@ export class RcSettingsComponent implements OnInit {
             break;
           }
           case ATSName.SEQUENCE: {
-            this.sequenceService.updateSequence(entity as Sequence).subscribe({
+            this.sequenceService.update(entity as Sequence).subscribe({
               next: (res) => addToMessageService(this.msgService, 'success', 'Update successful', res.message),
               error: (err) => addToMessageService(this.msgService, 'error', 'Update failed', err.message),
               complete: () => this.loadSettingsInfo()
             });
             break;
           }
-          default: addToMessageService(this.msgService, 'error', 'Error', 'Something has happened'); break;
+          default:
+            addToMessageService(this.msgService, 'error', 'Error', 'Something has happened');
+            break;
         }
       }
     }
@@ -233,7 +204,7 @@ export class RcSettingsComponent implements OnInit {
 
   addATSAction($event: MouseEvent, atsName: ATSName, inputElement: HTMLInputElement, seqTermAddInput?: HTMLSelectElement) {
     const addButton = $event.target as HTMLButtonElement;
-    if(inputElement.hidden) {
+    if (inputElement.hidden) {
       inputElement.hidden = false;
       addButton.textContent = "Save";
     } else {
@@ -242,8 +213,8 @@ export class RcSettingsComponent implements OnInit {
         case ATSName.SEQUENCE: {
           const termId = seqTermAddInput ? parseInt(seqTermAddInput.value) : -1;
           const seq: Sequence = {id: -1, name: entityValue, term_id: termId};
-          if(seq.term_id > 0 ) {
-            this.sequenceService.addSequence(seq).subscribe( {
+          if (seq.term_id > 0) {
+            this.sequenceService.save(seq).subscribe({
               next: (res) => addToMessageService(this.msgService, 'success', 'Success', res.message),
               error: (err) => addToMessageService(this.msgService, 'error', 'Error', err.error.message),
               complete: () => this.loadSettingsInfo()
@@ -253,7 +224,7 @@ export class RcSettingsComponent implements OnInit {
         }
         case ATSName.TERM: {
           const term: Term = {id: -1, name: entityValue};
-          this.termService.addTerm(term).subscribe({
+          this.termService.save(term).subscribe({
             next: (res) => addToMessageService(this.msgService, 'success', 'Success', res.message),
             error: (err) => addToMessageService(this.msgService, 'error', 'Error', err.error.message),
             complete: () => this.loadSettingsInfo()
@@ -261,9 +232,9 @@ export class RcSettingsComponent implements OnInit {
           break;
         }
         case ATSName.YEAR: {
-          if(AcademicYearUtil.isValid(entityValue)) {
+          if (AcademicYearUtil.isValid(entityValue)) {
             const year: AcademicYear = {id: -1, name: entityValue};
-            this.academicYearService.addAcademicYear(year).subscribe({
+            this.academicYearService.save(year).subscribe({
               next: (res) => addToMessageService(this.msgService, 'success', 'Success', res.message),
               error: (err) => addToMessageService(this.msgService, 'error', 'Error', err.error.message),
               complete: () => this.loadSettingsInfo()
@@ -292,10 +263,47 @@ export class RcSettingsComponent implements OnInit {
     }
 
     switch (res.length) {
-      case 0: return {id: -1, name: 'None'};
-      case 1: return res[0];
-      default: return {id: -1, name: 'None'};
+      case 0:
+        return {id: -1, name: 'None'};
+      case 1:
+        return res[0];
+      default:
+        return {id: -1, name: 'None'};
     }
+  }
+
+  private updateSchoolSettingsValid = (): void => {
+    if (this.schoolSettings == null) {
+      this.schoolSettingsValid = false;
+      return
+    }
+    this.schoolSettingsValid = this.schoolSettings != this.defaultSettings && (
+      this.schoolSettings.max_grade !== null && this.schoolSettings.min_grade !== null
+    );
+  }
+
+  private isValidSettings = (settings: SchoolSettings): { valid: boolean, errors: string[] } => {
+    console.log(settings)
+    const errs: string[] = [];
+    const term: Term = this.getTermBySequenceId(settings.curr_seq_id);
+    const sequencesByTerm = this.sequences.filter(seq => seq.term_id == term.id);
+    const sequenceValid: boolean = sequencesByTerm.find(seq => seq.id == settings.curr_seq_id) != undefined;
+
+    {
+      if (!sequenceValid) {
+        errs.push("This sequence is not compatible with this term");
+      }
+    }
+
+    const gradeValid = settings.min_grade < settings.max_grade;
+
+    {
+      if (!gradeValid) {
+        errs.push("Maximum grade score must be higher than the minimum grade score");
+      }
+    }
+
+    return {valid: sequenceValid && gradeValid, errors: errs};
   }
 }
 

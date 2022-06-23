@@ -1,5 +1,5 @@
 import {Subject} from "./subject.model";
-import {ClassLevelSub} from "./classlevelsub.model";
+import {ClassLevelSub} from "./class-level-sub.model";
 import {Grade} from "./grade.model";
 import {Student} from "./student.model";
 
@@ -15,5 +15,5 @@ export interface ClassListResponse {
   sequence_name: string;
   subject: Subject;
   class_level: ClassLevelSub;
-  student_grades: {student: Student, grade: Grade}[];
+  student_grades: { student: Student, grade: Grade }[];
 }

@@ -1,9 +1,9 @@
 import {Component, OnInit} from '@angular/core';
 import {FormArray, FormBuilder, FormGroup, Validators} from "@angular/forms";
-import {ClassLevel} from "../../../../models/dto/classlevel.model";
+import {ClassLevel} from "../../../../models/dto/class-level.model";
 import {NgbActiveModal} from "@ng-bootstrap/ng-bootstrap";
 import {ClassLevelSubService} from "../../../../services/class-level-sub.service";
-import {ClassLevelSub} from "../../../../models/dto/classlevelsub.model";
+import {ClassLevelSub} from "../../../../models/dto/class-level-sub.model";
 import {addToMessageService} from "../../../../utils/message-service.util";
 import {MessageService} from "primeng/api";
 import {ClassLevelService} from "../../../../services/class-level.service";
@@ -32,8 +32,13 @@ export class SaveClassComponent implements OnInit {
     return this.classForm.get('classLevels') as FormArray;
   }
 
+  ngOnInit(): void {
+    this.setupClassForm(this.classLevel);
+    this.setClassLevelSection(this.classLevel.section_id);
+  }
+
   setClassLevelSection(sectionId: number) {
-    this.sectionService.getSectionById(sectionId).subscribe({
+    this.sectionService.getById(sectionId).subscribe({
       next: (section: Section) => {
         this.section = section;
       },
@@ -41,11 +46,6 @@ export class SaveClassComponent implements OnInit {
         console.log(err);
       }
     });
-  }
-
-  ngOnInit(): void {
-    this.setupClassForm(this.classLevel);
-    this.setClassLevelSection(this.classLevel.section_id);
   }
 
   resetClassLevel(sectionId: number) {
@@ -60,8 +60,12 @@ export class SaveClassComponent implements OnInit {
       classLevels: this.fb.array([])
     });
 
+    this.loadClassLevelSubs(classLevel);
+  }
+
+  loadClassLevelSubs(classLevel: ClassLevel): void {
     if (classLevel.id > 0) {
-      this.classLevelSubService.getAllClassLevelSubsByClassLevelId(classLevel.id).subscribe({
+      this.classLevelSubService.getAllByClassLevelId(classLevel.id).subscribe({
         next: (classLevelSubs) => {
           this.classLevelSubs = classLevelSubs;
           classLevelSubs.forEach(classLevelSub => {
@@ -71,7 +75,7 @@ export class SaveClassComponent implements OnInit {
           });
         },
         error: () => addToMessageService(this.msg, 'warn', 'Warning!', 'Unable to retrieve class level subs')
-      })
+      });
     }
   }
 
@@ -79,12 +83,12 @@ export class SaveClassComponent implements OnInit {
     this.classLevel.name = this.classForm.get('name')?.value;
     if (this.classLevel.id < 0) {
       console.log(this.classLevel.section_id)
-      this.classLevelService.addClassLevel(this.classLevel).subscribe({
+      this.classLevelService.save(this.classLevel).subscribe({
         next: (res) => addToMessageService(this.msg, 'success', 'Save successful', res.message),
         error: (err) => addToMessageService(this.msg, 'error', 'Save failed', err.message)
       });
     } else {
-      this.classLevelService.updateClassLevel(this.classLevel).subscribe({
+      this.classLevelService.update(this.classLevel).subscribe({
         next: (res) => addToMessageService(this.msg, 'success', 'Update successful', res.message),
         error: (err) => addToMessageService(this.msg, 'error', 'Update failed', err.error.message)
       });
@@ -99,12 +103,12 @@ export class SaveClassComponent implements OnInit {
     console.log(classLevelSubInput.value);
     classLevelSub.name = classLevelSubInput.value;
     if (classLevelSub.id < 0) {
-      this.classLevelSubService.addClassLevelSub(classLevelSub).subscribe({
+      this.classLevelSubService.save(classLevelSub).subscribe({
         next: (res) => addToMessageService(this.msg, 'success', 'Save successful', res.message),
         error: (err) => addToMessageService(this.msg, 'error', 'Save failed', err.message)
       });
     } else {
-      this.classLevelSubService.updateClassLevelSub(classLevelSub).subscribe({
+      this.classLevelSubService.update(classLevelSub).subscribe({
         next: (res) => addToMessageService(this.msg, 'success', 'Update successful', res.message),
         error: (err) => addToMessageService(this.msg, 'error', 'Update failed', err.message)
       });
@@ -114,8 +118,11 @@ export class SaveClassComponent implements OnInit {
   deleteClassLevelSub(classLevelSub: ClassLevelSub) {
     const confirmDelete = confirm(`Are you sure you want to delete this class level sub: ${classLevelSub.name}`)
     if (confirmDelete) {
-      this.classLevelSubService.deleteClassLevelSub(classLevelSub.id).subscribe({
-        next: () => addToMessageService(this.msg, 'warn', 'Delete successful', `Class level sub ${classLevelSub.name} has been deleted`),
+      this.classLevelSubService.delete(classLevelSub.id).subscribe({
+        next: () => {
+          addToMessageService(this.msg, 'warn', 'Delete successful', `Class level sub ${classLevelSub.name} has been deleted`)
+          this.loadClassLevelSubs(this.classLevel);
+        },
         error: (err) => addToMessageService(this.msg, 'error', 'Delete failed', err.message)
       });
     }

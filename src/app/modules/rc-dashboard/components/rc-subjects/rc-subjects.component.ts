@@ -28,7 +28,7 @@ export class RcSubjectsComponent implements OnInit {
 
 
   loadSubjects(): void {
-    this.subjectService.getSubjects().subscribe({
+    this.subjectService.getAll().subscribe({
       next: (subjects) => this.subjects = subjects,
       error: (err) => addToMessageService(this.msgService, 'error', 'Error', err.message),
     })
@@ -39,7 +39,7 @@ export class RcSubjectsComponent implements OnInit {
       size: 'lg', centered: true, backdrop: 'static', keyboard: true
     });
     const saveSubjectComponent: SaveSubjectComponent = modalRef.componentInstance;
-    if(!subject) {
+    if (!subject) {
       saveSubjectComponent.resetSubject();
       saveSubjectComponent.subjectForm.reset();
     } else {
@@ -54,7 +54,7 @@ export class RcSubjectsComponent implements OnInit {
   deleteSubjectAction(subject: Subject) {
     const confirmDelete: boolean = confirm("Are you sure want to delete " + subject.name);
     if (confirmDelete) {
-      this.subjectService.deleteSubject(subject.id).subscribe({
+      this.subjectService.delete(subject.id).subscribe({
         // TODO remove this logs
         next: (res) => {
           addToMessageService(this.msgService, 'error', 'Error', res.message);
